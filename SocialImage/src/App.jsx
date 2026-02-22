@@ -3,7 +3,7 @@ import Navbar from './Components/Navbar'
 import Home from './routes/Home';
 import Search from './routes/Search';
 import Upload from './routes/Upload';
-import Setting from './routes/setting';
+import Setting from './routes/Setting';
 import UserBoard from './routes/UserBoard';
 
 
