@@ -22,7 +22,7 @@ const UserBoard = () => {
     const fetchMyPosts = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5000/posts/getpostbyid/${user.sub}`
+          `${import.meta.env.VITE_API_URL}/posts/getpostbyid/${user.sub}`
         );
         setPosts(res.data.data);
       } catch (err) {
@@ -90,7 +90,7 @@ if (!isAuthenticated || !user) {
         {posts.map((post) => (
           <img
             key={post._id}
-            src={`http://localhost:5000/${post.image}`}
+            src={`${import.meta.env.VITE_API_URL}/${post.image}`}
             className="rounded-xl break-inside-avoid"
             alt="post"
           />

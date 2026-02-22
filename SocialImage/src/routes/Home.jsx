@@ -8,7 +8,7 @@ const Home = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/posts/getallpost");
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/posts/getallpost`);
         setPosts(res.data.data);
       } catch (err) {
         console.log(err);
@@ -46,7 +46,7 @@ const PostCard = ({ post }) => {
     <div className="break-inside-avoid rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
 
       <img
-        src={`http://localhost:5000/${post.image}`}
+        src={`${import.meta.env.VITE_API_URL}/${post.image}`}
         alt="post"
         className="w-full object-cover rounded-2xl"
       />

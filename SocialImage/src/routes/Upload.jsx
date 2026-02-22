@@ -42,7 +42,7 @@ if (isLoading || !isAuthenticated) {
 
     try {
       await axios.post(
-        "http://localhost:5000/posts/createpost",
+        `${import.meta.env.VITE_API_URL}/posts/createpost`,
         formData,
         {
           headers: {
