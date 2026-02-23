@@ -3,7 +3,7 @@ import Post from "../models/post.model.js";
 export const createpost = async (req, res) => {
   try {
     const { caption, userId } = req.body;
-    const image = req.file ? req.file.path : null;
+    const image = req.file ? `uploads/${req.file.filename}` : null;
 
     if (!image || !caption) {
       return res.status(400).json({
