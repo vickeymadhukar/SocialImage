@@ -3,9 +3,8 @@ import Post from "../models/post.model.js";
 export const createpost = async (req, res) => {
   try {
     const { caption, userId } = req.body;
-    const image = req.file ? `uploads/${req.file.filename}` : null;
 
-    if (!image || !caption) {
+    if (!req.file || !caption) {
       return res.status(400).json({
         success: false,
         message: "Image and caption are required",

@@ -46,7 +46,7 @@ const PostCard = ({ post }) => {
     <div className="break-inside-avoid rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
 
       <img
-        src={`${import.meta.env.VITE_API_URL}/${post.image}`}
+        src={post.image}
         alt="post"
         className="w-full object-cover rounded-2xl"
       />
