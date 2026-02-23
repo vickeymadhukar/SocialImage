@@ -5,7 +5,7 @@ import postRoute from "./routes/post.route.js";
 const app = express();
 app.use(
   cors({
-    rigin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "https://socialimage-1.onrender.com"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
   }),
