@@ -11,7 +11,11 @@ export const createpost = async (req, res) => {
       });
     }
 
-    const newPost = await Post.create({ image, caption, userId });
+    const newPost = await Post.create({ 
+      image: req.file.path,
+      caption, 
+      userId });
+      
     res.status(201).json({
       success: true,
       data: newPost,
