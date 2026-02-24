@@ -90,7 +90,7 @@ if (!isAuthenticated || !user) {
         {posts.map((post) => (
           <img
             key={post._id}
-            src={`${import.meta.env.VITE_API_URL}/${post.image}`}
+            src={post.image}
             className="rounded-xl break-inside-avoid"
             alt="post"
           />
