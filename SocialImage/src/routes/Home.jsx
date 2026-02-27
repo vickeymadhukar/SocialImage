@@ -36,7 +36,7 @@ const Home = () => {
 
     try {
       const res = await axios.put(
-        `${import.meta.env.VITE_API_URL}/posts/like/${postId}`,
+        `${import.meta.env.VITE_API_URL}/posts/likes/${postId}`,
         { userId: user.sub }
       );
 
