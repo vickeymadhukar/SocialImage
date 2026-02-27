@@ -13,8 +13,7 @@ const postSchema = new mongoose.Schema(
       maxlength: [300, "Caption cannot exceed 200 characters"],
     },
     likes: {
-      type: Number,
-      default: 0,
+      type: String,
     },
     userId: {
       type: String,

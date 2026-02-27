@@ -11,11 +11,12 @@ export const createpost = async (req, res) => {
       });
     }
 
-    const newPost = await Post.create({ 
+    const newPost = await Post.create({
       image: req.file.path,
-      caption, 
-      userId });
-      
+      caption,
+      userId,
+    });
+
     res.status(201).json({
       success: true,
       data: newPost,
@@ -89,6 +90,43 @@ export const getPostsByUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching user posts",
+      error: error.message,
+    });
+  }
+};
+
+export const toggleLike = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { userId } = req.body;
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    const alreadyLiked = post.likes.includes(userId);
+
+    if (alreadyLiked) {
+      post.likes = post.likes.filter((id) => id !== userId);
+    } else {
+      post.likes.push(userId);
+    }
+    await post.save();
+
+    res.status(200).json({
+      success: true,
+      message: alreadyLiked ? "Post unliked" : "Post liked",
+      data: post,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error toggling like",
       error: error.message,
     });
   }
