@@ -40,18 +40,16 @@ const Home = () => {
         { userId: user.sub }
       );
 
-      setPosts((prev) =>
-        prev.map((post) =>
-          post._id === postId
-            ? {
-                ...post,
-                likes: res.data.isLiked
-                  ? [...post.likes, user.sub]
-                  : post.likes.filter((id) => id !== user.sub),
-              }
-            : post
-        )
-      );
+     setPosts((prevPosts) =>
+  prevPosts.map((post) =>
+    post._id === postId
+      ? {
+          ...post,
+          likes: Array(res.data.likesCount).fill("temp")
+        }
+      : post
+  )
+);
     } catch (error) {
       console.log(error);
     }
