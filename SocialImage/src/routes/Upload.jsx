@@ -1,27 +1,34 @@
-
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth0 } from "@auth0/auth0-react";
 
 export default function Upload() {
-  const { isAuthenticated, user, loginWithRedirect, isLoading } = useAuth0();
-
+  const { isAuthenticated, user ,loginWithRedirect,isLoading} = useAuth0();
   const [image, setImage] = useState(null);
   const [caption, setCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    if ((!isAuthenticated && !isLoading) || !user) {
+
+
+  useEffect(()=>{
+
+    if (!isAuthenticated && !isLoading || !user) {
       loginWithRedirect();
     }
-  }, [isLoading, isAuthenticated, user, loginWithRedirect]);
-
-  if (isLoading || !isAuthenticated) {
+  },[isLoading ,isAuthenticated,user,loginWithRedirect])
+  
+if (isLoading || !isAuthenticated) {
     return null;
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if(!isAuthenticated){
+      alert("Please login to upload a post");
+      return;
+    }
+
+
 
     if (!image || !caption) {
       alert("Please select image and add description");
@@ -34,8 +41,6 @@ export default function Upload() {
     formData.append("userId", user.sub);
 
     try {
-      setUploading(true);
-
       await axios.post(
         `${import.meta.env.VITE_API_URL}/posts/createpost`,
         formData,
@@ -50,55 +55,38 @@ export default function Upload() {
 
       setImage(null);
       setCaption("");
+
     } catch (err) {
       console.log(err);
       alert("Upload failed");
-    } finally {
-      setUploading(false);
     }
   };
+
+ 
 
   return (
     <div className="min-h-screen bg-white p-8">
 
-      {/* Uploading Modal */}
-      {uploading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-
-          <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4">
-
-            <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-
-            <p className="text-lg font-semibold">
-              Uploading your post...
-            </p>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* HEADER */}
+      {/* TOP HEADER BAR */}
       <div className="flex justify-between items-center mb-8">
 
         <h1 className="text-2xl font-semibold">
-          {user.name}
-        </h1>
+           {user.name}
+       </h1>
 
         <div className="flex items-center gap-6">
-
           <span className="text-gray-500 text-sm">
             Changes stored!
           </span>
 
           <button
             onClick={handleSubmit}
-            disabled={uploading}
-            className="bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition disabled:opacity-50"
+            className="bg-red-600 text-white px-6 py-3 
+                       rounded-full font-semibold 
+                       hover:bg-red-700 transition"
           >
             Publish
           </button>
-
         </div>
 
       </div>
@@ -106,13 +94,15 @@ export default function Upload() {
       {/* MAIN CONTENT */}
       <div className="grid md:grid-cols-2 md:gap-22 gap-15">
 
-        {/* LEFT SIDE */}
+        {/* LEFT SIDE - Upload Box */}
         <div className="bg-gray-200 rounded-3xl p-6 shadow-sm">
 
           <div
-            className="border-2 border-dashed border-white-300 rounded-3xl h-[400px] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-gray-50 transition"
+            className="border-2 border-dashed border-white-300 
+                       rounded-3xl h-[400px] flex flex-col 
+                       items-center justify-center text-center 
+                       cursor-pointer hover:bg-gray-50 transition"
           >
-
             <input
               type="file"
               className="hidden"
@@ -120,10 +110,7 @@ export default function Upload() {
               onChange={(e) => setImage(e.target.files[0])}
             />
 
-            <label
-              htmlFor="fileUpload"
-              className="cursor-pointer w-full h-full flex items-center justify-center"
-            >
+            <label htmlFor="fileUpload" className="cursor-pointer w-full h-full flex items-center justify-center">
 
               {image ? (
                 <img
@@ -153,32 +140,26 @@ export default function Upload() {
             </label>
 
           </div>
-
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* RIGHT SIDE - Form */}
         <div className="space-y-6">
 
           <div>
-
             <label className="block mb-2 text-sm font-medium">
               Title
             </label>
-
             <input
               type="text"
               placeholder="Add a title"
               className="w-full p-4 rounded-2xl bg-white border border-gray-200 focus:outline-none"
             />
-
           </div>
 
           <div>
-
             <label className="block mb-2 text-sm font-medium">
               Description
             </label>
-
             <textarea
               rows="4"
               placeholder="Add a detailed description"
@@ -186,15 +167,12 @@ export default function Upload() {
               onChange={(e) => setCaption(e.target.value)}
               className="w-full p-4 rounded-2xl bg-white border border-gray-200 focus:outline-none"
             />
-
           </div>
 
           <div>
-
             <label className="block mb-2 text-sm font-medium">
               Board
             </label>
-
             <select
               className="w-full p-4 rounded-2xl bg-white border border-gray-200 focus:outline-none"
             >
@@ -203,7 +181,6 @@ export default function Upload() {
               <option>Development</option>
               <option>Travel</option>
             </select>
-
           </div>
 
         </div>
@@ -213,4 +190,3 @@ export default function Upload() {
     </div>
   );
 }
-
