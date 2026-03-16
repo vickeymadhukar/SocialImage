@@ -6,7 +6,7 @@ export default function Upload() {
   const { isAuthenticated, user ,loginWithRedirect,isLoading} = useAuth0();
   const [image, setImage] = useState(null);
   const [caption, setCaption] = useState("");
-
+  const [uploading, setUploading] = useState(false);
 
 
   useEffect(()=>{
@@ -41,6 +41,7 @@ if (isLoading || !isAuthenticated) {
     formData.append("userId", user.sub);
 
     try {
+      setUploading(true);
       await axios.post(
         `${import.meta.env.VITE_API_URL}/posts/createpost`,
         formData,
@@ -60,12 +61,22 @@ if (isLoading || !isAuthenticated) {
       console.log(err);
       alert("Upload failed");
     }
+    finally{
+      setUploading(false);
+    }
+
   };
 
  
 
   return (
     <div className="min-h-screen bg-white p-8">
+      {uploading && ( <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"> 
+        <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4"> 
+          <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div> 
+          <p className="text-lg font-semibold"> Uploading your post... </p> 
+          </div> 
+          </div> )}
 
       {/* TOP HEADER BAR */}
       <div className="flex justify-between items-center mb-8">
