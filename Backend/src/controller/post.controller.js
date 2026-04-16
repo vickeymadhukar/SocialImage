@@ -32,13 +32,26 @@ export const createpost = async (req, res) => {
 
 export const getALLpost = async (req, res) => {
   try {
-    const allpost = await Post.find().sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const allpost = await Post.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalPosts = await Post.countDocuments();
+    const totalPages = Math.ceil(totalPosts / limit);
 
     res.status(200).json({
       success: true,
       message: "all post get successfully",
       count: allpost.length,
       data: allpost,
+      totalPages: totalPages,
+      currentPage: page,
+      totalPosts: totalPosts,
     });
   } catch (error) {
     res.status(500).json({

@@ -1,31 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState,useRef } from "react";
 import axios from "axios";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useAuth0 } from "@auth0/auth0-react";
 
+ 
 const Home = () => {
+ 
+
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loginWithRedirect } = useAuth0();
 
+  const[page , setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+
+const observer = useRef(); 
   // Fetch All Posts
   useEffect(() => {
     const fetchPosts = async () => {
       try {
+        if(page==1)setLoading(true);
+        else setLoadingMore(true);
+
         const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/posts/getallpost`
+          `${import.meta.env.VITE_API_URL}/posts/getallpost?page=${page}&limit=10`
         );
-        setPosts(res.data.data);
+
+         if (page === 1) {
+             setPosts(res.data.data);
+                } else {
+                      setPosts((prev) => [...prev, ...res.data.data]);
+                          }
+        
+          if (page >= res.data.totalPages) {
+        setHasMore(false);
+      }
+
+
+
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchPosts();
-  }, []);
+  }, [page]);
 
   // Like / Unlike Handler
   const handleLike = async (postId) => {
@@ -41,8 +66,8 @@ const Home = () => {
       );
 
      setPosts((prevPosts) =>
-  prevPosts.map((post) =>
-    post._id === postId
+      prevPosts.map((post) =>
+      post._id === postId
       ? {
           ...post,
           likes: Array(res.data.likesCount).fill("temp")
@@ -55,26 +80,67 @@ const Home = () => {
     }
   };
 
+
+const lastPostRef =(node)=>{
+  if(loadingMore) return;
+  if(observer.current) observer.current.disconnect();
+
+   observer.current = new IntersectionObserver((entries)=>{
+    if(entries[0].isIntersecting && hasMore){
+      setPage((prev)=>prev+1);
+    }
+   });
+ if (node) observer.current.observe(node);
+}
+
+
+
+
   return (
     <div className="min-h-screen bg-white p-6">
       <SkeletonTheme baseColor="#ebebeb" highlightColor="#f5f5f5">
         <div className="columns-2 md:columns-4 lg:columns-6 gap-6 space-y-6">
-          {loading
-            ? Array.from({ length: 12 }).map((_, i) => (
-                <PostSkeleton key={i} />
-              ))
-            : posts.map((post) => (
+          
+          {/* Initial Loading */}
+          {loading &&
+            Array.from({ length: 12 }).map((_, i) => (
+              <PostSkeleton key={i} />
+            ))}
+
+          {/* Posts */}
+          {!loading &&
+            posts.map((post, index) => {
+              if (index === posts.length - 1) {
+                return (
+                  <div ref={lastPostRef} key={post._id}>
+                    <PostCard
+                      post={post}
+                      handleLike={handleLike}
+                      currentUser={user}
+                    />
+                  </div>
+                );
+              }
+
+              return (
                 <PostCard
                   key={post._id}
                   post={post}
                   handleLike={handleLike}
                   currentUser={user}
                 />
-              ))}
+              );
+            })}
         </div>
+
+        {/* Loading More */}
+        {loadingMore && (
+          <div className="text-center mt-6">Loading more...</div>
+        )}
       </SkeletonTheme>
     </div>
   );
+
 };
 
 
@@ -143,6 +209,16 @@ const PostCard = ({ post, handleLike, currentUser }) => {
 
     </div>
   );
+
+
+
+
+
 };
+
+
+
+
+
 
 export default Home;

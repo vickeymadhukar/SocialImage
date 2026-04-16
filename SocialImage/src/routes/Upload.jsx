@@ -13,8 +13,8 @@ export default function Upload() {
 
     if (!isAuthenticated && !isLoading || !user) {
       loginWithRedirect();
-    }
-  },[isLoading ,isAuthenticated,user,loginWithRedirect])
+     }
+     },[isLoading ,isAuthenticated,user,loginWithRedirect])
   
 if (isLoading || !isAuthenticated) {
     return null;
