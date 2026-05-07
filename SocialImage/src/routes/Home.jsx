@@ -1,43 +1,43 @@
-import { useEffect, useState,useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useAuth0 } from "@auth0/auth0-react";
 
- 
+
 const Home = () => {
- 
+
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loginWithRedirect } = useAuth0();
 
-  const[page , setPage] = useState(1);
+  const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
 
-const observer = useRef(); 
+  const observer = useRef();
   // Fetch All Posts
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        if(page==1)setLoading(true);
+        if (page == 1) setLoading(true);
         else setLoadingMore(true);
 
         const res = await axios.get(
           `${import.meta.env.VITE_API_URL}/posts/getallpost?page=${page}&limit=10`
         );
 
-         if (page === 1) {
-             setPosts(res.data.data);
-                } else {
-                      setPosts((prev) => [...prev, ...res.data.data]);
-                          }
-        
-          if (page >= res.data.totalPages) {
-        setHasMore(false);
-      }
+        if (page === 1) {
+          setPosts(res.data.data);
+        } else {
+          setPosts((prev) => [...prev, ...res.data.data]);
+        }
+
+        if (page >= res.data.totalPages) {
+          setHasMore(false);
+        }
 
 
 
@@ -65,33 +65,33 @@ const observer = useRef();
         { userId: user.sub }
       );
 
-     setPosts((prevPosts) =>
-      prevPosts.map((post) =>
-      post._id === postId
-      ? {
-          ...post,
-          likes: Array(res.data.likesCount).fill("temp")
-        }
-      : post
-  )
-);
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post._id === postId
+            ? {
+              ...post,
+              likes: Array(res.data.likesCount).fill("temp")
+            }
+            : post
+        )
+      );
     } catch (error) {
       console.log(error);
     }
   };
 
 
-const lastPostRef =(node)=>{
-  if(loadingMore) return;
-  if(observer.current) observer.current.disconnect();
+  const lastPostRef = (node) => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
 
-   observer.current = new IntersectionObserver((entries)=>{
-    if(entries[0].isIntersecting && hasMore){
-      setPage((prev)=>prev+1);
-    }
-   });
- if (node) observer.current.observe(node);
-}
+    observer.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage((prev) => prev + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }
 
 
 
@@ -100,7 +100,7 @@ const lastPostRef =(node)=>{
     <div className="min-h-screen bg-white p-6">
       <SkeletonTheme baseColor="#ebebeb" highlightColor="#f5f5f5">
         <div className="columns-2 md:columns-4 lg:columns-6 gap-6 space-y-6">
-          
+
           {/* Initial Loading */}
           {loading &&
             Array.from({ length: 12 }).map((_, i) => (
@@ -168,7 +168,7 @@ const PostCard = ({ post, handleLike, currentUser }) => {
 
   return (
     <div className="break-inside-avoid rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition mb-6">
-      
+
       {/* Image */}
       <img
         src={post.image}
@@ -182,9 +182,8 @@ const PostCard = ({ post, handleLike, currentUser }) => {
         <div className="p-3">
           <p
             onClick={() => setExpanded(!expanded)}
-            className={`text-sm text-gray-700 cursor-pointer ${
-              expanded ? "" : "line-clamp-2"
-            }`}
+            className={`text-sm text-gray-700 cursor-pointer ${expanded ? "" : "line-clamp-2"
+              }`}
           >
             {post.caption}
           </p>
@@ -195,9 +194,8 @@ const PostCard = ({ post, handleLike, currentUser }) => {
       <div className="flex items-center gap-2 px-3 pb-3">
         <button
           onClick={() => handleLike(post._id)}
-          className={`text-xl transition ${
-            isLiked ? "text-red-500" : "text-gray-400"
-          }`}
+          className={`text-xl transition ${isLiked ? "text-red-500" : "text-gray-400"
+            }`}
         >
           {isLiked ? "❤️" : "🤍"}
         </button>
