@@ -66,11 +66,15 @@ export const getALLpost = async (req, res) => {
     // The next cursor is the ID of the last post in the active page data
     const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
 
-  await redisClient.set("test", "hello redis");
-
-const value = await redisClient.get("test");
-
-console.log(value);
+    if (redisClient && redisClient.isOpen) {
+      try {
+        await redisClient.set("test", "hello redis");
+        const value = await redisClient.get("test");
+        console.log("Redis Test Value:", value);
+      } catch (redisError) {
+        console.error("Redis operation failed:", redisError.message);
+      }
+    }
 
 
 

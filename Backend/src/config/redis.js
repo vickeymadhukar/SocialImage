@@ -1,21 +1,36 @@
 import { createClient } from "redis";
 
-const redisClient = createClient({
-  username: process.env.REDIS_USERNAME,
-  password: process.env.REDIS_PASSWORD,
+let redisClient = null;
+let isRedisConnected = false;
 
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT,
-  },
-});
+if (process.env.REDIS_HOST || process.env.REDIS_URL) {
+  const connectionConfig = process.env.REDIS_URL 
+    ? { url: process.env.REDIS_URL }
+    : {
+        username: process.env.REDIS_USERNAME,
+        password: process.env.REDIS_PASSWORD,
+        socket: {
+          host: process.env.REDIS_HOST,
+          port: process.env.REDIS_PORT,
+        },
+      };
 
-redisClient.on("error", (err) => {
-  console.log("Redis Error", err);
-});
+  redisClient = createClient(connectionConfig);
 
-await redisClient.connect();
+  redisClient.on("error", (err) => {
+    console.error("Redis Client Error:", err.message || err);
+  });
 
-console.log("Redis Connected");
+  try {
+    await redisClient.connect();
+    console.log("Redis Connected successfully");
+    isRedisConnected = true;
+  } catch (error) {
+    console.error("Failed to connect to Redis on startup:", error.message || error);
+  }
+} else {
+  console.log("Redis config (REDIS_HOST or REDIS_URL) not found. Skipping Redis connection.");
+}
 
+export { isRedisConnected };
 export default redisClient;
