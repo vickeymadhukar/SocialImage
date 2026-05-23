@@ -175,20 +175,23 @@ export const toggleLike = async (req, res) => {
     }
 
     const alreadyLiked = post.likes.includes(userId);
+    const updateQuery = alreadyLiked
+      ? { $pull: { likes: userId } }
+      : { $addToSet: { likes: userId } };
 
-    if (alreadyLiked) {
-      post.likes = post.likes.filter((id) => id !== userId);
-    } else {
-      post.likes.push(userId);
-    }
-    await post.save();
+    const updatedPost = await Post.findByIdAndUpdate(
+      postId,
+      updateQuery,
+      { new: true }
+    );
 
     await clearPostsCache();
 
     res.status(200).json({
       success: true,
       message: alreadyLiked ? "Post unliked" : "Post liked",
-      likesCount: post.likes.length,
+      likes: updatedPost.likes,
+      likesCount: updatedPost.likes.length,
     });
   } catch (error) {
     res.status(500).json({

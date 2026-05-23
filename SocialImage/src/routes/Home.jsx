@@ -59,24 +59,53 @@ const Home = () => {
       return;
     }
 
+    const userId = user?.sub;
+    if (!userId) return;
+
+    const originalPost = posts.find((p) => p._id === postId);
+    if (!originalPost) return;
+
+    const wasLiked = originalPost.likes?.includes(userId);
+
+    // Calculate optimistic likes array
+    const optimisticLikes = wasLiked
+      ? (originalPost.likes || []).filter((id) => id !== userId)
+      : [...(originalPost.likes || []), userId];
+
+    // 1. Update UI optimistically
+    setPosts((prevPosts) =>
+      prevPosts.map((post) =>
+        post._id === postId
+          ? { ...post, likes: optimisticLikes }
+          : post
+      )
+    );
+
     try {
+      // 2. Perform background request
       const res = await axios.put(
         `${import.meta.env.VITE_API_URL}/posts/likes/${postId}`,
-        { userId: user.sub }
+        { userId }
       );
 
+      // 3. Update state with actual likes array from backend
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
           post._id === postId
-            ? {
-              ...post,
-              likes: Array(res.data.likesCount).fill("temp")
-            }
+            ? { ...post, likes: res.data.likes }
             : post
         )
       );
     } catch (error) {
-      console.log(error);
+      console.error("Like toggle failed:", error);
+      // 4. Revert to original state on failure
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post._id === postId
+            ? { ...post, likes: originalPost.likes }
+            : post
+        )
+      );
     }
   };
 
