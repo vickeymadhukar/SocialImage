@@ -32,26 +32,46 @@ export const createpost = async (req, res) => {
 
 export const getALLpost = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const cursor = req.query.cursor; // This will be the ID of the last post on the previous page
 
-    const allpost = await Post.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    let query = {};
 
-    const totalPosts = await Post.countDocuments();
-    const totalPages = Math.ceil(totalPosts / limit);
+    if (cursor) {
+      const cursorPost = await Post.findById(cursor);
+      if (cursorPost) {
+        query = {
+          $or: [
+            { createdAt: { $lt: cursorPost.createdAt } },
+            {
+              createdAt: cursorPost.createdAt,
+              _id: { $lt: cursorPost._id },
+            },
+          ],
+        };
+      }
+    }
+
+    // Fetch limit + 1 posts to see if there is a next page
+    const allpost = await Post.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1);
+
+    const hasNextPage = allpost.length > limit;
+
+    // If hasNextPage is true, slice off the extra post used for checking
+    const data = hasNextPage ? allpost.slice(0, limit) : allpost;
+
+    // The next cursor is the ID of the last post in the active page data
+    const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
 
     res.status(200).json({
       success: true,
       message: "all post get successfully",
-      count: allpost.length,
-      data: allpost,
-      totalPages: totalPages,
-      currentPage: page,
-      totalPosts: totalPosts,
+      count: data.length,
+      data: data,
+      nextCursor: nextCursor,
+      hasNextPage: hasNextPage,
     });
   } catch (error) {
     res.status(500).json({

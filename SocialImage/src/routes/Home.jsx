@@ -12,7 +12,8 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loginWithRedirect } = useAuth0();
 
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState(null);
+  const [nextCursor, setNextCursor] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -22,24 +23,23 @@ const Home = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        if (page == 1) setLoading(true);
+        if (!cursor) setLoading(true);
         else setLoadingMore(true);
 
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/posts/getallpost?page=${page}&limit=10`
-        );
+        const url = cursor
+          ? `${import.meta.env.VITE_API_URL}/posts/getallpost?cursor=${cursor}&limit=10`
+          : `${import.meta.env.VITE_API_URL}/posts/getallpost?limit=10`;
 
-        if (page === 1) {
+        const res = await axios.get(url);
+
+        if (!cursor) {
           setPosts(res.data.data);
         } else {
           setPosts((prev) => [...prev, ...res.data.data]);
         }
 
-        if (page >= res.data.totalPages) {
-          setHasMore(false);
-        }
-
-
+        setNextCursor(res.data.nextCursor);
+        setHasMore(res.data.hasNextPage);
 
       } catch (err) {
         console.error(err);
@@ -50,7 +50,7 @@ const Home = () => {
     };
 
     fetchPosts();
-  }, [page]);
+  }, [cursor]);
 
   // Like / Unlike Handler
   const handleLike = async (postId) => {
@@ -86,8 +86,8 @@ const Home = () => {
     if (observer.current) observer.current.disconnect();
 
     observer.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage((prev) => prev + 1);
+      if (entries[0].isIntersecting && hasMore && nextCursor) {
+        setCursor(nextCursor);
       }
     });
     if (node) observer.current.observe(node);
