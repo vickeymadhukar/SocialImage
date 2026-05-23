@@ -1,4 +1,5 @@
 import Post from "../models/post.model.js";
+import redisClient from "../config/redis.js";
 
 export const createpost = async (req, res) => {
   try {
@@ -64,6 +65,14 @@ export const getALLpost = async (req, res) => {
 
     // The next cursor is the ID of the last post in the active page data
     const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
+
+  await redisClient.set("test", "hello redis");
+
+const value = await redisClient.get("test");
+
+console.log(value);
+
+
 
     res.status(200).json({
       success: true,
