@@ -32,5 +32,25 @@ if (process.env.REDIS_HOST || process.env.REDIS_URL) {
   console.log("Redis config (REDIS_HOST or REDIS_URL) not found. Skipping Redis connection.");
 }
 
+export const clearPostsCache = async () => {
+  if (!redisClient || !redisClient.isOpen) return;
+  try {
+    let cursor = "0";
+    do {
+      const reply = await redisClient.scan(cursor, {
+        MATCH: "posts:*",
+        COUNT: 100,
+      });
+      cursor = reply.cursor;
+      if (reply.keys && reply.keys.length > 0) {
+        await redisClient.del(reply.keys);
+      }
+    } while (cursor !== "0");
+    console.log("Redis posts cache cleared successfully.");
+  } catch (error) {
+    console.error("Failed to clear Redis cache:", error.message || error);
+  }
+};
+
 export { isRedisConnected };
 export default redisClient;

@@ -1,5 +1,5 @@
 import Post from "../models/post.model.js";
-import redisClient from "../config/redis.js";
+import redisClient, { clearPostsCache } from "../config/redis.js";
 
 export const createpost = async (req, res) => {
   try {
@@ -18,6 +18,8 @@ export const createpost = async (req, res) => {
       userId,
     });
 
+    await clearPostsCache();
+
     res.status(201).json({
       success: true,
       data: newPost,
@@ -35,6 +37,21 @@ export const getALLpost = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const cursor = req.query.cursor; // This will be the ID of the last post on the previous page
+
+    const cacheKey = `posts:page:limit:${limit}:cursor:${cursor || "start"}`;
+
+    // Try to serve from Redis cache
+    if (redisClient && redisClient.isOpen) {
+      try {
+        const cachedData = await redisClient.get(cacheKey);
+        if (cachedData) {
+          console.log(`Serving posts from Redis cache for key: ${cacheKey}`);
+          return res.status(200).json(JSON.parse(cachedData));
+        }
+      } catch (redisError) {
+        console.error("Redis read failed:", redisError.message);
+      }
+    }
 
     let query = {};
 
@@ -66,26 +83,26 @@ export const getALLpost = async (req, res) => {
     // The next cursor is the ID of the last post in the active page data
     const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
 
-    if (redisClient && redisClient.isOpen) {
-      try {
-        await redisClient.set("test", "hello redis");
-        const value = await redisClient.get("test");
-        console.log("Redis Test Value:", value);
-      } catch (redisError) {
-        console.error("Redis operation failed:", redisError.message);
-      }
-    }
-
-
-
-    res.status(200).json({
+    const responseData = {
       success: true,
       message: "all post get successfully",
       count: data.length,
       data: data,
       nextCursor: nextCursor,
       hasNextPage: hasNextPage,
-    });
+    };
+
+    // Cache the result in Redis for 1 hour (3600 seconds)
+    if (redisClient && redisClient.isOpen) {
+      try {
+        await redisClient.setEx(cacheKey, 3600, JSON.stringify(responseData));
+        console.log(`Cached posts in Redis for key: ${cacheKey}`);
+      } catch (redisError) {
+        console.error("Redis write failed:", redisError.message);
+      }
+    }
+
+    res.status(200).json(responseData);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -106,6 +123,8 @@ export const deletePost = async (req, res) => {
         message: "post not found with this id",
       });
     }
+
+    await clearPostsCache();
 
     res.status(200).json({
       success: true,
@@ -163,6 +182,8 @@ export const toggleLike = async (req, res) => {
       post.likes.push(userId);
     }
     await post.save();
+
+    await clearPostsCache();
 
     res.status(200).json({
       success: true,
