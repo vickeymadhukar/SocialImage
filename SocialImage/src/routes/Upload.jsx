@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Camera, Image, FolderOpen, X } from "lucide-react";
+import { compressImage } from "../utils/compressor.js";
 
 export default function Upload() {
   const { isAuthenticated, user, loginWithRedirect, isLoading } = useAuth0();
@@ -14,10 +15,17 @@ export default function Upload() {
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setImage(file);
+      try {
+        const qualityPreset = localStorage.getItem("socialimage_upload_optimization") || "high";
+        const optimizedFile = await compressImage(file, qualityPreset);
+        setImage(optimizedFile);
+      } catch (error) {
+        console.error("Compression failed, using original file:", error);
+        setImage(file);
+      }
       setIsDrawerOpen(false);
     }
   };
@@ -108,10 +116,8 @@ export default function Upload() {
             Changes stored!
           </span>
 
-          <button
-            onClick={handleSubmit}
-            className="bg-red-600 text-white px-6 py-3 
-                       rounded-full font-semibold 
+          <button onClick={handleSubmit}
+            className="bg-red-600 text-white px-6 py-3  rounded-full font-semibold 
                        hover:bg-red-700 transition"
           >
             Publish

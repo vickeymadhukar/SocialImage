@@ -1,34 +1,177 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth0 } from "@auth0/auth0-react";
-import { 
-  User, Settings, Lock, Bell, Shield, Sparkles, 
+import axios from "axios";
+import {
+  User, Settings, Lock, Bell, Shield, Sparkles,
   CheckCircle, AlertTriangle, Eye, EyeOff, LogOut, ChevronRight
 } from "lucide-react";
+import { compressImage } from "../utils/compressor.js";
 
 const Setting = () => {
   const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0();
-  
+
   // Settings Tab State
   const [activeTab, setActiveTab] = useState("profile");
-  
+
   // Interactive Local States for Preferences
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailDigest, setEmailDigest] = useState(false);
   const [profilePrivate, setProfilePrivate] = useState(false);
-  const [imageQuality, setImageQuality] = useState("high");
-  
-  // Profile edit states
-  const [displayName, setDisplayName] = useState(user?.name || "John Doe");
-  const [bio, setBio] = useState("Exploring the world through a lens and sharing moments. ✨");
+  const [imageQuality, setImageQuality] = useState(() => {
+    return localStorage.getItem("socialimage_upload_optimization") || "high";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("socialimage_upload_optimization", imageQuality);
+  }, [imageQuality]);
+
+  // MongoDB user profile states
+  const [dbUser, setDbUser] = useState(null);
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+  const [dob, setDob] = useState("");
+  const [age, setAge] = useState(null);
+
+  // Profile picture upload states
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState("");
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const handleSaveProfile = (e) => {
+  // Load from localStorage cache immediately when user is authenticated/available
+  useEffect(() => {
+    if (!user) return;
+    const cached = localStorage.getItem(`socialimage_user_profile_${user.sub}`);
+    if (cached) {
+      const u = JSON.parse(cached);
+      setDbUser(u);
+      setDisplayName(u.name || user.name || "");
+      setEmail(u.email || user.email || "");
+      setBio(u.bio || "");
+      setDob(u.dob ? u.dob.substring(0, 10) : "");
+      setAge(u.age);
+      setProfileImagePreview(u.profileImage || user.picture || "");
+    } else {
+      // Fallback to Auth0 defaults initially to avoid empty inputs before API resolves
+      setDisplayName(user.name || "");
+      setEmail(user.email || "");
+      setProfileImagePreview(user.picture || "");
+    }
+  }, [user]);
+
+  // Sync and fetch profile details from MongoDB
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const syncProfile = async () => {
+      try {
+        const res = await axios.post(`${import.meta.env.VITE_API_URL}/users/sync`, {
+          userId: user.sub,
+          name: user.name,
+          email: user.email,
+          profileImage: user.picture,
+        });
+        if (res.data.success) {
+          const u = res.data.data;
+          setDbUser(u);
+          setDisplayName(u.name || user.name || "");
+          setEmail(u.email || user.email || "");
+          setBio(u.bio || "");
+          setDob(u.dob ? u.dob.substring(0, 10) : "");
+          setAge(u.age);
+          setProfileImagePreview(u.profileImage || user.picture || "");
+          
+          // Save to user-specific cache
+          localStorage.setItem(`socialimage_user_profile_${user.sub}`, JSON.stringify(u));
+        }
+      } catch (err) {
+        console.error("Error syncing profile with MongoDB:", err);
+      }
+    };
+
+    syncProfile();
+  }, [user, isAuthenticated]);
+
+  // Handle client-side instant age calculation when DOB changes
+  const handleDobChange = (e) => {
+    const selectedDob = e.target.value;
+    setDob(selectedDob);
+    if (selectedDob) {
+      const today = new Date();
+      const birthDate = new Date(selectedDob);
+      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
+      setAge(calculatedAge);
+    } else {
+      setAge(null);
+    }
+  };
+
+  // Upload profile image separately/individually to Cloudinary
+  const handleUploadProfileImage = async (e) => {
     e.preventDefault();
-    setIsEditingProfile(false);
-    setShowSavedToast(true);
-    setTimeout(() => setShowSavedToast(false), 3000);
+    if (!profileImageFile) return;
+
+    const formData = new FormData();
+    formData.append("userId", user.sub);
+    formData.append("profileImage", profileImageFile);
+
+    try {
+      const res = await axios.patch(
+        `${import.meta.env.VITE_API_URL}/users/profile/${user.sub}`,
+        formData
+      );
+      if (res.data.success) {
+        const updated = res.data.data;
+        setDbUser(updated);
+        setProfileImagePreview(updated.profileImage);
+        setProfileImageFile(null);
+        localStorage.setItem(`socialimage_user_profile_${user.sub}`, JSON.stringify(updated));
+        alert("profileimage updated");
+      }
+    } catch (err) {
+      console.error("Error uploading profile image:", err);
+      alert("Failed to upload profile image.");
+    }
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append("userId", user.sub);
+    formData.append("name", displayName);
+    formData.append("email", email);
+    formData.append("bio", bio);
+    formData.append("dob", dob);
+
+    try {
+      setIsEditingProfile(false);
+      const res = await axios.patch(`${import.meta.env.VITE_API_URL}/users/profile/${user.sub}`, formData);
+      if (res.data.success) {
+        const updated = res.data.data;
+        setDbUser(updated);
+        setDisplayName(updated.name);
+        setEmail(updated.email);
+        setBio(updated.bio);
+        setDob(updated.dob ? updated.dob.substring(0, 10) : "");
+        setAge(updated.age);
+        
+        localStorage.setItem(`socialimage_user_profile_${user.sub}`, JSON.stringify(updated));
+
+        setShowSavedToast(true);
+        setTimeout(() => setShowSavedToast(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      alert("Failed to update profile details. Please try again.");
+    }
   };
 
   const tabs = [
@@ -39,15 +182,13 @@ const Setting = () => {
   ];
 
   const ToggleSwitch = ({ checked, onChange }) => (
-    <button 
+    <button
       onClick={onChange}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-        checked ? 'bg-slate-900' : 'bg-slate-200'
-      }`}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-slate-900' : 'bg-slate-200'
+        }`}
     >
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-        checked ? 'translate-x-4.5' : 'translate-x-1'
-      }`} />
+      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-205 ${checked ? 'translate-x-4.5' : 'translate-x-1'
+        }`} />
     </button>
   );
 
@@ -73,13 +214,13 @@ const Setting = () => {
               This action is permanent and cannot be undone. All your posts, likes, followers, and comments will be permanently erased.
             </p>
             <div className="flex gap-2 justify-end">
-              <button 
+              <button
                 onClick={() => setShowDeleteModal(false)}
                 className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-md transition"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => {
                   alert("Account deletion initiated (Demo)");
                   setShowDeleteModal(false);
@@ -95,7 +236,7 @@ const Setting = () => {
 
       {/* Settings Container */}
       <div className="max-w-4xl mx-auto pt-12 px-4">
-        
+
         {/* Header */}
         <div className="mb-8 border-b border-slate-200 pb-5">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Settings</h1>
@@ -122,21 +263,25 @@ const Setting = () => {
         ) : (
           /* Settings Content Wrapper */
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-            
+
             {/* Minimal Sidebar navigation */}
             <div className="md:col-span-4 space-y-4">
               <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
-                
+
                 {/* User card in sidebar */}
                 <div className="flex items-center gap-3 pb-3 border-b border-slate-100 mb-3">
-                  <img 
-                    src={user?.picture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop"} 
-                    alt="avatar" 
+                  <img
+                    src={profileImagePreview || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop"}
+                    alt="avatar"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop";
+                    }}
                     className="w-9 h-9 rounded-full object-cover"
                   />
                   <div className="min-w-0">
-                    <p className="font-bold text-slate-800 text-xs truncate">{user?.name || displayName}</p>
-                    <p className="text-slate-400 text-[10px] truncate font-medium">{user?.email || "Authenticated"}</p>
+                    <p className="font-bold text-slate-800 text-xs truncate">{displayName || user?.name}</p>
+                    <p className="text-slate-400 text-[10px] truncate font-medium">{email || user?.email || "Authenticated"}</p>
                   </div>
                 </div>
 
@@ -147,11 +292,10 @@ const Setting = () => {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-left text-xs transition duration-150 ${
-                          activeTab === tab.id
-                            ? "bg-slate-100 text-slate-900 font-bold"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                        }`}
+                        className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-left text-xs transition duration-150 ${activeTab === tab.id
+                          ? "bg-slate-100 text-slate-900 font-bold"
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                          }`}
                       >
                         <Icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-slate-800' : 'text-slate-400'}`} />
                         <span>{tab.label}</span>
@@ -173,7 +317,7 @@ const Setting = () => {
 
             {/* Right Pane minimal content */}
             <div className="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200/60 p-6 min-h-[400px]">
-              
+
               {/* Profile settings tab */}
               {activeTab === "profile" && (
                 <div className="space-y-6">
@@ -184,22 +328,76 @@ const Setting = () => {
 
                   <form onSubmit={handleSaveProfile} className="space-y-5">
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-                      <img 
-                        src={user?.picture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop"} 
-                        alt="avatar" 
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <div className="space-y-0.5">
+                      <div className="relative group">
+                        <img
+                          src={profileImagePreview || user?.picture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop"}
+                          alt="avatar"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=250&auto=format&fit=crop";
+                          }}
+                          className="w-14 h-14 rounded-full object-cover border border-slate-200"
+                        />
+                        <label className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center text-white text-[9px] font-bold opacity-0 group-hover:opacity-100 cursor-pointer transition duration-205">
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                try {
+                                  const optimizedFile = await compressImage(file, imageQuality);
+                                  setProfileImageFile(optimizedFile);
+                                  setProfileImagePreview(URL.createObjectURL(optimizedFile));
+                                } catch (error) {
+                                  console.error("Compression failed, using original: ", error);
+                                  setProfileImageFile(file);
+                                  setProfileImagePreview(URL.createObjectURL(file));
+                                }
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="space-y-1">
                         <h4 className="text-xs font-bold text-slate-800">Avatar Image</h4>
-                        <p className="text-[10px] text-slate-400 font-medium">Synced from Auth0 identity records.</p>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          {profileImageFile
+                            ? "New picture selected! Click Upload to confirm."
+                            : "Hover avatar to change profile picture."}
+                        </p>
+                        {profileImageFile && (
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={handleUploadProfileImage}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded-md text-[10px] transition shadow-xs cursor-pointer"
+                            >
+                              Upload Image
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProfileImageFile(null);
+                                setProfileImagePreview(dbUser?.profileImage || user?.picture || "");
+                              }}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold px-2 py-1 rounded-md text-[10px] transition cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Display Username</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
                           disabled={!isEditingProfile}
@@ -208,18 +406,42 @@ const Setting = () => {
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Account Email Address</label>
-                        <input 
-                          type="email" 
-                          value={user?.email || "user@socialimage.com"}
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={!isEditingProfile}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-60 transition"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date of Birth and Automatically Calculated Age */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date of Birth</label>
+                        <input
+                          type="date"
+                          value={dob}
+                          onChange={handleDobChange}
+                          disabled={!isEditingProfile}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:opacity-60 transition"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Calculated Age</label>
+                        <input
+                          type="text"
+                          value={age !== null && age !== undefined ? `${age} years old` : "No Date of Birth set"}
                           disabled
-                          className="w-full px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium cursor-not-allowed focus:outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-slate-150 border border-slate-200 text-slate-500 text-xs font-semibold cursor-not-allowed focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Personal Biography</label>
-                      <textarea 
+                      <textarea
                         rows="3"
                         value={bio}
                         onChange={(e) => setBio(e.target.value)}
@@ -234,7 +456,7 @@ const Setting = () => {
                         <button
                           type="button"
                           onClick={() => setIsEditingProfile(true)}
-                          className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition"
+                          className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition cursor-pointer"
                         >
                           Edit Profile
                         </button>
@@ -243,17 +465,31 @@ const Setting = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              setDisplayName(user?.name || "John Doe");
-                              setBio("Exploring the world through a lens and sharing moments. ✨");
+                              if (dbUser) {
+                                setDisplayName(dbUser.name || user?.name || "");
+                                setEmail(dbUser.email || user?.email || "");
+                                setBio(dbUser.bio || "");
+                                setDob(dbUser.dob ? dbUser.dob.substring(0, 10) : "");
+                                setAge(dbUser.age);
+                                setProfileImagePreview(dbUser.profileImage || user?.picture || "");
+                              } else {
+                                setDisplayName(user?.name || "");
+                                setEmail(user?.email || "");
+                                setBio("");
+                                setDob("");
+                                setAge(null);
+                                setProfileImagePreview(user?.picture || "");
+                              }
+                              setProfileImageFile(null);
                               setIsEditingProfile(false);
                             }}
-                            className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg transition"
+                            className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg transition cursor-pointer"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
-                            className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition"
+                            className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition cursor-pointer"
                           >
                             Save Changes
                           </button>
@@ -297,8 +533,8 @@ const Setting = () => {
                         <h4 className="text-xs font-bold text-slate-800">Upload Optimization</h4>
                         <p className="text-[10px] text-slate-400 font-medium">Choose preferred image compression size criteria.</p>
                       </div>
-                      <select 
-                        value={imageQuality} 
+                      <select
+                        value={imageQuality}
                         onChange={(e) => setImageQuality(e.target.value)}
                         className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-400 transition"
                       >
@@ -347,7 +583,7 @@ const Setting = () => {
                       </div>
                       <button
                         onClick={() => setShowDeleteModal(true)}
-                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-lg text-xs font-bold border border-rose-150 transition"
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-lg text-xs font-bold border border-rose-150 transition cursor-pointer"
                       >
                         Delete Personal Account
                       </button>
@@ -382,11 +618,11 @@ const Setting = () => {
 
                     <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-slate-400 font-medium">Need developer support?</span>
-                      <a 
-                        href="https://github.com" 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="px-2.5 py-1 text-slate-600 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm font-semibold transition"
+                      <a
+                        href="https://github.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 text-slate-600 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 rounded-lg shadow-sm font-semibold transition cursor-pointer"
                       >
                         Visit GitHub
                       </a>

@@ -45,7 +45,7 @@ export const clearPostsCache = async () => {
       if (reply.keys && reply.keys.length > 0) {
         await redisClient.del(reply.keys);
       }
-    } while (cursor !== "0");
+    } while (cursor !== "0" && cursor !== 0);
     console.log("Redis posts cache cleared successfully.");
   } catch (error) {
     console.error("Failed to clear Redis cache:", error.message || error);

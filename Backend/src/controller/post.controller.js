@@ -18,7 +18,7 @@ export const createpost = async (req, res) => {
       userId,
     });
 
-    await clearPostsCache();
+    clearPostsCache();
 
     res.status(201).json({
       success: true,
@@ -124,7 +124,7 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    await clearPostsCache();
+    clearPostsCache();
 
     res.status(200).json({
       success: true,
@@ -185,7 +185,7 @@ export const toggleLike = async (req, res) => {
       { new: true }
     );
 
-    await clearPostsCache();
+    clearPostsCache();
 
     res.status(200).json({
       success: true,
