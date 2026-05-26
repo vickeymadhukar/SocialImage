@@ -10,6 +10,9 @@ export default function Upload() {
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -44,16 +47,22 @@ export default function Upload() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setSuccess("");
 
     if (!isAuthenticated) {
-      alert("Please login to upload a post");
+      setError("Please login to upload a post");
       return;
     }
 
-
-
     if (!image || !caption) {
-      alert("Please select image and add description");
+      setError("Please select an image and add a description");
+      return;
+    }
+
+    // Pre-upload validation: Check if file size is > 5MB
+    if (image.size > 5 * 1024 * 1024) {
+      setError("Image size is too large! Maximum allowed size is 5MB. Please compress your image or select a smaller file.");
       return;
     }
 
@@ -62,8 +71,25 @@ export default function Upload() {
     formData.append("caption", caption);
     formData.append("userId", user.sub);
 
+    let progressInterval = null;
+
     try {
       setUploading(true);
+      setUploadProgress(0);
+
+      // Smooth progress animation: Increments up to 95% over 1-2 seconds
+      progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return 95;
+          }
+          // Increments faster at first, then slows down
+          const increment = Math.max(1, Math.round((98 - prev) * 0.12));
+          return prev + increment;
+        });
+      }, 70);
+      
       await axios.post(
         `${import.meta.env.VITE_API_URL}/posts/createpost`,
         formData,
@@ -71,22 +97,41 @@ export default function Upload() {
           headers: {
             "Content-Type": "multipart/form-data",
           },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            // In case the network is slower than the simulation, take the higher progress
+            setUploadProgress((prev) => Math.max(prev, percentCompleted));
+          },
         }
       );
 
-      alert("Post uploaded successfully!");
+      // Once done, clear simulation and complete to 100%
+      if (progressInterval) clearInterval(progressInterval);
+      setUploadProgress(100);
 
+      // Short delay so the user can see the 100% complete bar before it resets
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setSuccess("Post uploaded successfully!");
       setImage(null);
       setCaption("");
+      
+      // Auto-clear success message after 5 seconds
+      setTimeout(() => {
+        setSuccess("");
+      }, 5000);
 
     } catch (err) {
-      console.log(err);
-      alert("Upload failed");
-    }
-    finally {
+      if (progressInterval) clearInterval(progressInterval);
+      console.error("Upload error details:", err);
+      const errMsg = err.response?.data?.message || err.message || "Upload failed. Please try again.";
+      setError(errMsg);
+    } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
-
   };
   const generateAICaption = async () => {
 
@@ -97,13 +142,6 @@ export default function Upload() {
 
   return (
     <div className="min-h-screen bg-white p-8">
-      {uploading && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-8 rounded-2xl flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-lg font-semibold"> Uploading your post... </p>
-        </div>
-      </div>)}
-
       {/* TOP HEADER BAR */}
       <div className="flex justify-between items-center mb-8">
 
@@ -116,16 +154,76 @@ export default function Upload() {
             Changes stored!
           </span>
 
-          <button onClick={handleSubmit}
-            className="bg-red-600 text-white px-6 py-3  rounded-full font-semibold 
-                       hover:bg-red-700 transition"
+          <button 
+            onClick={handleSubmit}
+            disabled={uploading}
+            className={`px-6 py-3 rounded-full font-semibold transition duration-200 ease-in-out ${
+              uploading 
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                : "bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-sm"
+            }`}
           >
-            Publish
+            {uploading ? "Publishing..." : "Publish"}
           </button>
         </div>
 
       </div>
 
+      {/* Inline Notifications & Progress Bar */}
+      <div className="max-w-4xl mx-auto">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-2xl flex items-start gap-3 shadow-xs animate-fade-in transition duration-300">
+            <div className="text-red-500 mt-0.5 shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-red-800 text-sm">Upload Failed</h4>
+              <p className="text-xs text-red-700 mt-0.5">{error}</p>
+            </div>
+            <button onClick={() => setError("")} className="text-red-400 hover:text-red-600 transition shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-2xl flex items-start gap-3 shadow-xs animate-fade-in transition duration-300">
+            <div className="text-emerald-500 mt-0.5 shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-emerald-800 text-sm">Success!</h4>
+              <p className="text-xs text-emerald-700 mt-0.5">{success}</p>
+            </div>
+            <button onClick={() => setSuccess("")} className="text-emerald-400 hover:text-emerald-600 transition shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Bar Loading Indicator */}
+        {uploading && (
+          <div className="mb-8 bg-gray-50 border border-gray-100 rounded-2xl p-5 shadow-xs transition-all duration-300">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-ping"></div>
+                <span className="text-sm font-semibold text-gray-700">Uploading your post...</span>
+              </div>
+              <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">{uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid md:grid-cols-2 md:gap-22 gap-15">
 
