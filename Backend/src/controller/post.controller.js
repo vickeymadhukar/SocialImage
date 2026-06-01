@@ -12,10 +12,21 @@ export const createpost = async (req, res) => {
       });
     }
 
+    // Extract AI tags and category from Cloudinary response
+    const tags = req.file.tags || [];
+    const category =
+      req.file.info?.categorization?.google_tagging?.data?.[0]?.tag ||
+      "General";
+
+    console.log("Cloudinary tags →", tags);
+    console.log("Cloudinary category →", category);
+
     const newPost = await Post.create({
       image: req.file.path,
       caption,
       userId,
+      tags,
+      category,
     });
 
     clearPostsCache();
@@ -33,14 +44,44 @@ export const createpost = async (req, res) => {
   }
 };
 
+export const searchPosts = async (req, res) => {
+  try {
+    const { q, category } = req.query;
+    let query = {};
+
+    if (q) {
+      query.$text = { $search: q };
+    }
+
+    if (category && category !== "All") {
+      query.category = category;
+    }
+
+    const posts = await Post.find(query)
+      .sort(q ? { score: { $meta: "textScore" } } : { createdAt: -1 })
+      .limit(10);
+
+    res.status(200).json({
+      success: true,
+      count: posts.length,
+      data: posts,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error searching posts",
+      error: error.message,
+    });
+  }
+};
+
 export const getALLpost = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
-    const cursor = req.query.cursor; // This will be the ID of the last post on the previous page
+    const cursor = req.query.cursor;
 
     const cacheKey = `posts:page:limit:${limit}:cursor:${cursor || "start"}`;
 
-    // Try to serve from Redis cache
     if (redisClient && redisClient.isOpen) {
       try {
         const cachedData = await redisClient.get(cacheKey);
@@ -70,18 +111,14 @@ export const getALLpost = async (req, res) => {
       }
     }
 
-    // Fetch limit + 1 posts to see if there is a next page
     const allpost = await Post.find(query)
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit + 1);
 
     const hasNextPage = allpost.length > limit;
-
-    // If hasNextPage is true, slice off the extra post used for checking
     const data = hasNextPage ? allpost.slice(0, limit) : allpost;
-
-    // The next cursor is the ID of the last post in the active page data
-    const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
+    const nextCursor =
+      hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
 
     const responseData = {
       success: true,
@@ -92,7 +129,6 @@ export const getALLpost = async (req, res) => {
       hasNextPage: hasNextPage,
     };
 
-    // Cache the result in Redis for 1 hour (3600 seconds)
     if (redisClient && redisClient.isOpen) {
       try {
         await redisClient.setEx(cacheKey, 3600, JSON.stringify(responseData));
@@ -179,11 +215,9 @@ export const toggleLike = async (req, res) => {
       ? { $pull: { likes: userId } }
       : { $addToSet: { likes: userId } };
 
-    const updatedPost = await Post.findByIdAndUpdate(
-      postId,
-      updateQuery,
-      { new: true }
-    );
+    const updatedPost = await Post.findByIdAndUpdate(postId, updateQuery, {
+      new: true,
+    });
 
     clearPostsCache();
 

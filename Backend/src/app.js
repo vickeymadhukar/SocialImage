@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://socialimage-1.onrender.com"],
+    origin: ["http://localhost:5173", "https://socialimage-1.onrender.com","http://localhost:5000"],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type"],
   }),

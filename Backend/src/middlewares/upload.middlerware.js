@@ -7,6 +7,8 @@ const storage = new CloudinaryStorage({
   params: {
     folder: "socialimage",
     allowed_formats: ["jpg", "jpeg", "png", "webp"],
+    categorization: "google_tagging",   // ← add this
+    auto_tagging: 0.7,  
   },
 });
 

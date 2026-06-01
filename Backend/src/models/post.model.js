@@ -20,11 +20,21 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: [true, "User ID is required"],
     },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    category: {
+      type: String,
+      default: "General",
+    },
   },
   {
     timestamps: true,
   },
 );
+
+postSchema.index({ caption: "text", tags: "text" });
 
 const Post = mongoose.model("Post", postSchema);
 
