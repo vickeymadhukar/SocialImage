@@ -3,10 +3,11 @@ import axios from "axios";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useAuth0 } from "@auth0/auth0-react";
+import useDebounce from "../hooks/useDebounce";
+import SearchBar from "../Components/SearchBar";
 
 
 const Home = () => {
-
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +18,10 @@ const Home = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
+  // Search state
+  const [query, setQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const debouncedQuery = useDebounce(query, 300);
 
   const observer = useRef();
   // Fetch All Posts
@@ -122,51 +127,91 @@ const Home = () => {
     if (node) observer.current.observe(node);
   }
 
-
-
+  // Filter posts client-side based on search query + category
+  const isSearching = debouncedQuery.trim() !== "" || selectedCategory !== "All";
+  const filteredPosts = isSearching
+    ? posts.filter((post) => {
+        const q = debouncedQuery.trim().toLowerCase();
+        const matchesQuery =
+          !q ||
+          post.caption?.toLowerCase().includes(q) ||
+          post.tags?.some((t) => t.toLowerCase().includes(q));
+        const matchesCategory =
+          selectedCategory === "All" ||
+          post.category === selectedCategory ||
+          post.tags?.some(
+            (t) => t.toLowerCase() === selectedCategory.toLowerCase()
+          );
+        return matchesQuery && matchesCategory;
+      })
+    : posts;
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <SkeletonTheme baseColor="#ebebeb" highlightColor="#f5f5f5">
-        <div className="columns-2 md:columns-4 lg:columns-6 gap-6 space-y-6">
+    <div className="min-h-screen bg-white">
+      {/* Search bar sticky at top */}
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 py-4">
+        <SearchBar
+          value={query}
+          onChange={setQuery}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+        />
+      </div>
 
-          {/* Initial Loading */}
-          {loading &&
-            Array.from({ length: 12 }).map((_, i) => (
-              <PostSkeleton key={i} />
-            ))}
+      <div className="p-6">
+        <SkeletonTheme baseColor="#ebebeb" highlightColor="#f5f5f5">
+          <div className="columns-2 md:columns-4 lg:columns-6 gap-6 space-y-6">
 
-          {/* Posts */}
-          {!loading &&
-            posts.map((post, index) => {
-              if (index === posts.length - 1) {
+            {/* Initial Loading */}
+            {loading &&
+              Array.from({ length: 12 }).map((_, i) => (
+                <PostSkeleton key={i} />
+              ))}
+
+            {/* Posts */}
+            {!loading &&
+              filteredPosts.map((post, index) => {
+                // Only attach infinite scroll sentinel when NOT filtering
+                if (!isSearching && index === filteredPosts.length - 1) {
+                  return (
+                    <div ref={lastPostRef} key={post._id}>
+                      <PostCard
+                        post={post}
+                        handleLike={handleLike}
+                        currentUser={user}
+                      />
+                    </div>
+                  );
+                }
+
                 return (
-                  <div ref={lastPostRef} key={post._id}>
-                    <PostCard
-                      post={post}
-                      handleLike={handleLike}
-                      currentUser={user}
-                    />
-                  </div>
+                  <PostCard
+                    key={post._id}
+                    post={post}
+                    handleLike={handleLike}
+                    currentUser={user}
+                  />
                 );
-              }
+              })}
+          </div>
 
-              return (
-                <PostCard
-                  key={post._id}
-                  post={post}
-                  handleLike={handleLike}
-                  currentUser={user}
-                />
-              );
-            })}
-        </div>
+          {/* No search results */}
+          {!loading && isSearching && filteredPosts.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <span className="text-5xl mb-4">🔍</span>
+              <h3 className="text-lg font-semibold text-gray-800">No results found</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Try a different keyword or category
+              </p>
+            </div>
+          )}
 
-        {/* Loading More */}
-        {loadingMore && (
-          <div className="text-center mt-6">Loading more...</div>
-        )}
-      </SkeletonTheme>
+          {/* Loading More */}
+          {loadingMore && (
+            <div className="text-center mt-6 text-sm text-gray-400">Loading more...</div>
+          )}
+        </SkeletonTheme>
+      </div>
     </div>
   );
 

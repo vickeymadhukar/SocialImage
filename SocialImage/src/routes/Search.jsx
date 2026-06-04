@@ -1,19 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useAuth0 } from "@auth0/auth0-react";
+import useDebounce from "../hooks/useDebounce";
 import SearchBar from "../Components/SearchBar";
 
-// Debounce helper — waits until user stops typing before firing
-function useDebounce(value, delay) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
 
 const Search = () => {
   const { user, isAuthenticated, loginWithRedirect } = useAuth0();
