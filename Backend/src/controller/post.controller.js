@@ -8,7 +8,7 @@ export const createpost = async (req, res) => {
     if (!req.file || !caption) {
       return res.status(400).json({
         success: false,
-        message: "Image and caption are required",
+        message: "Image and caption are required", 
       });
     }
 
@@ -44,6 +44,10 @@ export const createpost = async (req, res) => {
   }
 };
 
+
+
+
+
 export const searchPosts = async (req, res) => {
   try {
     const { q, category } = req.query;
@@ -74,6 +78,9 @@ export const searchPosts = async (req, res) => {
     });
   }
 };
+
+
+
 
 export const getALLpost = async (req, res) => {
   try {
@@ -117,8 +124,7 @@ export const getALLpost = async (req, res) => {
 
     const hasNextPage = allpost.length > limit;
     const data = hasNextPage ? allpost.slice(0, limit) : allpost;
-    const nextCursor =
-      hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
+    const nextCursor = hasNextPage && data.length > 0 ? data[data.length - 1]._id : null;
 
     const responseData = {
       success: true,
