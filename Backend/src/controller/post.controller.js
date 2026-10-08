@@ -13,9 +13,14 @@ export const createpost = async (req, res) => {
     }
 
     // Extract AI tags and category from Cloudinary response
-    const tags = req.file.tags || [];
+    const tags =
+      req.file.tags && req.file.tags.length > 0
+        ? req.file.tags
+        : (req.file.info?.categorization?.google_tagging?.data || []).map((d) => d.tag);
+
     const category =
       req.file.info?.categorization?.google_tagging?.data?.[0]?.tag ||
+      tags[0] ||
       "General";
 
     console.log("Cloudinary tags →", tags);
